@@ -1,6 +1,10 @@
 # Environment / Secrets
 .env
 *.env
+!.env.example
+
+# Docker
+docker-compose.override.yml
 
 # Claude Code
 .claude/

@@ -1,4 +1,4 @@
-package com.LearnStreamApplication.StreamApplication;
+package com.learnstream;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
