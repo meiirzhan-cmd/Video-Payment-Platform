@@ -36,7 +36,6 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 	implementation platform('software.amazon.awssdk:bom:2.29.0')
 	implementation 'software.amazon.awssdk:s3'
-	implementation 'software.amazon.awssdk:s3-presigner:2.29.0'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
 	annotationProcessor 'org.projectlombok:lombok'
