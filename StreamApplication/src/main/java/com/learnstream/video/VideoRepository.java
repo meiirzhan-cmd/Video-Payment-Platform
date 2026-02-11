@@ -20,4 +20,6 @@ public interface VideoRepository extends JpaRepository<Video, UUID> {
     Page<Video> searchReadyVideos(@Param("search") String search, Pageable pageable);
 
     Page<Video> findByStatusOrderByCreatedAtDesc(VideoStatus status, Pageable pageable);
+
+    long countByCreatorId(UUID creatorId);
 }

@@ -1,8 +1,10 @@
 package com.learnstream.video;
 
 import com.learnstream.storage.StorageService;
+import com.learnstream.transcoding.TranscodingService;
 import com.learnstream.video.dto.CreateVideoRequest;
 import com.learnstream.video.dto.PageResponse;
+import com.learnstream.video.dto.StreamResponse;
 import com.learnstream.video.dto.UpdateVideoRequest;
 import com.learnstream.video.dto.VideoResponse;
 import com.learnstream.video.exception.InvalidVideoFileException;
@@ -27,10 +29,14 @@ public class VideoService {
 
     private final VideoRepository videoRepository;
     private final StorageService storageService;
+    private final TranscodingService transcodingService;
 
-    public VideoService(VideoRepository videoRepository, StorageService storageService) {
+    public VideoService(VideoRepository videoRepository,
+                        StorageService storageService,
+                        TranscodingService transcodingService) {
         this.videoRepository = videoRepository;
         this.storageService = storageService;
+        this.transcodingService = transcodingService;
     }
 
     @Transactional
@@ -69,7 +75,7 @@ public class VideoService {
         video.setStatus(VideoStatus.PROCESSING);
         videoRepository.save(video);
 
-        // TODO: dispatch transcoding job (Phase 4)
+        transcodingService.createJob(video.getId());
 
         return VideoResponse.from(video);
     }
@@ -135,6 +141,21 @@ public class VideoService {
     public PageResponse<VideoResponse> listCreatorVideos(UUID creatorId, Pageable pageable) {
         var page = videoRepository.findByCreatorId(creatorId, pageable);
         return PageResponse.from(page, VideoResponse::from);
+    }
+
+    @Transactional(readOnly = true)
+    public StreamResponse getStreamUrl(UUID videoId) {
+        var video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new VideoNotFoundException(videoId));
+
+        if (video.getStatus() != VideoStatus.READY || video.getHlsStorageKey() == null) {
+            throw new VideoAccessDeniedException();
+        }
+
+        var url = storageService.generatePresignedUrl(
+                storageService.processedBucket(), video.getHlsStorageKey(), 60);
+
+        return new StreamResponse(url.toString());
     }
 
     private void validateVideoFile(MultipartFile file) {

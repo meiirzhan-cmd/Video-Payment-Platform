@@ -1,10 +1,13 @@
 package com.learnstream.video;
 
 import com.learnstream.auth.CurrentUser;
+import com.learnstream.payment.PaymentService;
 import com.learnstream.video.dto.CreateVideoRequest;
 import com.learnstream.video.dto.PageResponse;
+import com.learnstream.video.dto.StreamResponse;
 import com.learnstream.video.dto.UpdateVideoRequest;
 import com.learnstream.video.dto.VideoResponse;
+import com.learnstream.video.exception.VideoAccessDeniedException;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -23,9 +26,11 @@ import java.util.UUID;
 public class VideoController {
 
     private final VideoService videoService;
+    private final PaymentService paymentService;
 
-    public VideoController(VideoService videoService) {
+    public VideoController(VideoService videoService, PaymentService paymentService) {
         this.videoService = videoService;
+        this.paymentService = paymentService;
     }
 
     // ── Public endpoints ──────────────────────────────────────
@@ -74,6 +79,18 @@ public class VideoController {
             @CurrentUser UUID creatorId) {
         videoService.delete(id, creatorId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Streaming endpoint (authenticated + authorized) ──────
+
+    @GetMapping("/videos/{id}/stream")
+    public ResponseEntity<StreamResponse> streamVideo(
+            @PathVariable UUID id,
+            @CurrentUser UUID userId) {
+        if (!paymentService.hasAccess(userId, id)) {
+            throw new VideoAccessDeniedException();
+        }
+        return ResponseEntity.ok(videoService.getStreamUrl(id));
     }
 
     @GetMapping("/creator/videos")
