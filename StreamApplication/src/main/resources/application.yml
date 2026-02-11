@@ -27,6 +27,10 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
+logging:
+  level:
+    "[org.springframework.web.filter.CommonsRequestLoggingFilter]": DEBUG
+
 jwt:
   secret: ${JWT_SECRET}
   access-token-expiration: 900000
@@ -37,6 +41,29 @@ minio:
   access-key: ${MINIO_ACCESS_KEY}
   secret-key: ${MINIO_SECRET_KEY}
   bucket: ${MINIO_BUCKET:video-uploads}
+
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY:sk_test_placeholder}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET:whsec_placeholder}
+
+transcoding:
+  ffmpeg-path: ${FFMPEG_PATH:/usr/bin/ffmpeg}
+  ffprobe-path: ${FFPROBE_PATH:/usr/bin/ffprobe}
+  temp-dir: ${TRANSCODING_TEMP_DIR:/tmp/transcoding}
+  poll-interval-ms: ${TRANSCODING_POLL_INTERVAL:5000}
+  qualities:
+    - label: 360p
+      width: 640
+      height: 360
+      bitrate: 800k
+    - label: 720p
+      width: 1280
+      height: 720
+      bitrate: 2500k
+    - label: 1080p
+      width: 1920
+      height: 1080
+      bitrate: 5000k
 
 ---
 # LOCAL profile: services on localhost
