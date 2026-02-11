@@ -26,6 +26,12 @@ WORKDIR /app
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 
+# Install FFmpeg for transcoding
+RUN apk add --no-cache ffmpeg
+
+# Create temp directory for transcoding
+RUN mkdir -p /tmp/transcoding && chown appuser:appgroup /tmp/transcoding
+
 COPY --from=builder /app/build/libs/*.jar app.jar
 
 USER appuser
