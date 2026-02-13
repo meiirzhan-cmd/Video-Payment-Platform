@@ -1,51 +1,44 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { Loader2, ShoppingCart } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Loader2, LogIn, Pencil, Play, ShoppingCart } from 'lucide-react';
 import * as videosApi from '@/api/videos';
 import * as paymentsApi from '@/api/payments';
 import type { VideoResponse } from '@/lib/types';
 import { formatPrice, formatDate, formatDuration } from '@/lib/format';
 import { useAuthStore } from '@/auth/auth-store';
+import { usePurchaseStatus } from '@/hooks/usePurchaseStatus';
 import StatusBadge from '@/shared/components/StatusBadge';
 import Button from '@/shared/components/Button';
-import VideoPlayer from '@/videos/components/VideoPlayer';
 
 export default function VideoDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const [video, setVideo] = useState<VideoResponse | null>(null);
-  const [hlsUrl, setHlsUrl] = useState<string | null>(null);
-  const [hasAccess, setHasAccess] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [buying, setBuying] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { owned, loading: accessLoading } = usePurchaseStatus(id);
+
+  const isCreator = user && video && user.id === video.creatorId;
 
   useEffect(() => {
     if (!id) return;
-
+    let cancelled = false;
     async function load() {
       setIsLoading(true);
       try {
         const v = await videosApi.getById(id!);
-        setVideo(v);
-
-        if (user && v.status === 'READY') {
-          const access = await paymentsApi.checkAccess(id!);
-          setHasAccess(access.hasAccess);
-          if (access.hasAccess) {
-            const stream = await videosApi.getStreamUrl(id!);
-            setHlsUrl(stream.hlsUrl);
-          }
-        }
+        if (!cancelled) setVideo(v);
       } catch {
-        setError('Failed to load video');
+        if (!cancelled) setError('Failed to load video');
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     }
-
     load();
-  }, [id, user]);
+    return () => { cancelled = true; };
+  }, [id]);
 
   const handleBuy = async () => {
     if (!video) return;
@@ -75,47 +68,93 @@ export default function VideoDetailPage() {
     );
   }
 
+  const renderCta = () => {
+    if (video.status !== 'READY') return null;
+
+    // Creator viewing own video
+    if (isCreator) {
+      return (
+        <div className="flex gap-2">
+          <Button onClick={() => navigate(`/videos/${video.id}/watch`)} size="lg">
+            <Play className="h-4 w-4" />
+            Watch Preview
+          </Button>
+          <Link to={`/creator/videos/${video.id}/edit`}>
+            <Button variant="secondary" size="lg">
+              <Pencil className="h-4 w-4" />
+              Edit
+            </Button>
+          </Link>
+        </div>
+      );
+    }
+
+    // Not logged in
+    if (!user) {
+      return (
+        <Link to="/login" state={{ from: { pathname: `/videos/${video.id}` } }}>
+          <Button size="lg">
+            <LogIn className="h-4 w-4" />
+            Login to Purchase
+          </Button>
+        </Link>
+      );
+    }
+
+    // Access still loading
+    if (accessLoading) {
+      return <Loader2 className="h-6 w-6 animate-spin text-primary" />;
+    }
+
+    // Already purchased
+    if (owned) {
+      return (
+        <Button onClick={() => navigate(`/videos/${video.id}/watch`)} size="lg">
+          <Play className="h-4 w-4" />
+          Watch Now
+        </Button>
+      );
+    }
+
+    // Not purchased — buy button
+    return (
+      <Button onClick={handleBuy} loading={buying} size="lg">
+        <ShoppingCart className="h-4 w-4" />
+        {video.priceCents === 0 ? 'Get for free' : `Buy for ${formatPrice(video.priceCents)}`}
+      </Button>
+    );
+  };
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
-      {/* Player or thumbnail */}
-      {hasAccess && hlsUrl ? (
-        <VideoPlayer src={hlsUrl} />
-      ) : (
-        <div className="relative aspect-video overflow-hidden rounded-lg bg-gray-100">
-          {video.thumbnailUrl ? (
-            <img src={video.thumbnailUrl} alt={video.title} className="h-full w-full object-cover" />
-          ) : (
-            <div className="flex h-full items-center justify-center text-gray-400">
-              No preview available
-            </div>
-          )}
-        </div>
-      )}
+      {/* Thumbnail preview */}
+      <div className="relative aspect-video overflow-hidden rounded-lg bg-gray-100">
+        {video.thumbnailUrl ? (
+          <img src={video.thumbnailUrl} alt={video.title} className="h-full w-full object-cover" loading="lazy" />
+        ) : (
+          <div className="flex h-full items-center justify-center text-gray-400">
+            No preview available
+          </div>
+        )}
+      </div>
 
-      {/* Info */}
+      {/* Info + CTA */}
       <div className="space-y-4">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">{video.title}</h1>
-            <div className="mt-1 flex items-center gap-3 text-sm text-gray-500">
+            <div className="mt-1 flex flex-wrap items-center gap-3 text-sm text-gray-500">
               <span>{formatDate(video.createdAt)}</span>
               {video.durationSecs != null && <span>{formatDuration(video.durationSecs)}</span>}
               <StatusBadge status={video.status} />
+              {video.priceCents === 0 ? (
+                <span className="font-medium text-success">Free</span>
+              ) : (
+                <span className="font-medium text-primary">{formatPrice(video.priceCents)}</span>
+              )}
             </div>
           </div>
-
-          {/* Buy or price */}
-          {!hasAccess && user && video.status === 'READY' && (
-            <Button onClick={handleBuy} loading={buying} size="lg">
-              <ShoppingCart className="h-4 w-4" />
-              {video.priceCents === 0 ? 'Get for free' : `Buy for ${formatPrice(video.priceCents)}`}
-            </Button>
-          )}
-          {!user && video.status === 'READY' && (
-            <span className="text-lg font-semibold text-primary">
-              {video.priceCents === 0 ? 'Free' : formatPrice(video.priceCents)}
-            </span>
-          )}
+          {renderCta()}
         </div>
 
         {video.description && (
