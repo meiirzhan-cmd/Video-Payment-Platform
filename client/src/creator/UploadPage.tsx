@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,11 +8,15 @@ import * as videosApi from '@/api/videos';
 import Input from '@/shared/components/Input';
 import Button from '@/shared/components/Button';
 
+const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
+const ACCEPTED_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
+
 export default function UploadPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState<'form' | 'upload'>('form');
   const [videoId, setVideoId] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
+  const [fileError, setFileError] = useState('');
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -26,6 +30,16 @@ export default function UploadPage() {
     defaultValues: { priceCents: 0 },
   });
 
+  // Prevent accidental navigation during upload
+  useEffect(() => {
+    if (!uploading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [uploading]);
+
   const onCreateVideo = async (data: CreateVideoFormData) => {
     setError('');
     try {
@@ -35,6 +49,26 @@ export default function UploadPage() {
     } catch {
       setError('Failed to create video');
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFileError('');
+    const selected = e.target.files?.[0] ?? null;
+    if (!selected) {
+      setFile(null);
+      return;
+    }
+    if (!ACCEPTED_TYPES.includes(selected.type)) {
+      setFileError('Please select a valid video file (MP4, MOV, WebM, AVI)');
+      setFile(null);
+      return;
+    }
+    if (selected.size > MAX_FILE_SIZE) {
+      setFileError('File size must be under 2 GB');
+      setFile(null);
+      return;
+    }
+    setFile(selected);
   };
 
   const onUploadFile = async () => {
@@ -101,12 +135,19 @@ export default function UploadPage() {
             <label className="text-sm font-medium text-gray-700">Video File</label>
             <input
               type="file"
-              accept="video/*"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo"
+              onChange={handleFileChange}
+              disabled={uploading}
               className="text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0
                 file:bg-primary-light file:px-4 file:py-2 file:text-sm file:font-medium
                 file:text-primary hover:file:bg-indigo-100"
             />
+            {fileError && <p className="text-xs text-danger">{fileError}</p>}
+            {file && (
+              <p className="text-xs text-gray-500">
+                {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
+              </p>
+            )}
           </div>
 
           {uploading && (
@@ -121,7 +162,7 @@ export default function UploadPage() {
             </div>
           )}
 
-          <Button onClick={onUploadFile} loading={uploading} disabled={!file}>
+          <Button onClick={onUploadFile} loading={uploading} disabled={!file || !!fileError}>
             <Upload className="h-4 w-4" />
             Upload
           </Button>
