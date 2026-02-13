@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Loader2, Plus, Film, DollarSign, ShoppingBag } from 'lucide-react';
+import { Loader2, Plus, Film, DollarSign, ShoppingBag, Trash2 } from 'lucide-react';
 import * as videosApi from '@/api/videos';
 import * as paymentsApi from '@/api/payments';
 import type { CreatorStatsResponse, PageResponse, VideoResponse } from '@/lib/types';
@@ -8,29 +8,62 @@ import { formatPrice, formatDate } from '@/lib/format';
 import StatusBadge from '@/shared/components/StatusBadge';
 import Button from '@/shared/components/Button';
 import Pagination from '@/shared/components/Pagination';
+import Modal from '@/shared/components/Modal';
+import { useToastStore } from '@/shared/toast-store';
 
 export default function DashboardPage() {
   const [stats, setStats] = useState<CreatorStatsResponse | null>(null);
   const [videos, setVideos] = useState<PageResponse<VideoResponse> | null>(null);
   const [page, setPage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteTarget, setDeleteTarget] = useState<VideoResponse | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const addToast = useToastStore((s) => s.add);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const fetchData = useCallback(async () => {
+    try {
+      const [s, v] = await Promise.all([
+        paymentsApi.getCreatorStats(),
+        videosApi.listCreatorVideos(page),
+      ]);
+      setStats(s);
+      setVideos(v);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [page]);
 
   useEffect(() => {
-    async function load() {
-      setIsLoading(true);
-      try {
-        const [s, v] = await Promise.all([
-          paymentsApi.getCreatorStats(),
-          videosApi.listCreatorVideos(page),
-        ]);
-        setStats(s);
-        setVideos(v);
-      } finally {
-        setIsLoading(false);
-      }
+    setIsLoading(true);
+    fetchData();
+  }, [fetchData]);
+
+  // Poll while any video is PROCESSING
+  useEffect(() => {
+    const hasProcessing = videos?.content.some((v) => v.status === 'PROCESSING');
+    if (hasProcessing) {
+      pollRef.current = setInterval(fetchData, 10000);
     }
-    load();
-  }, [page]);
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, [videos, fetchData]);
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
+    try {
+      await videosApi.remove(deleteTarget.id);
+      addToast('Video deleted', 'success');
+      setDeleteTarget(null);
+      fetchData();
+    } catch {
+      addToast('Failed to delete video', 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   if (isLoading && !videos) {
     return (
@@ -104,19 +137,32 @@ export default function DashboardPage() {
                     <tr key={v.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3 font-medium text-gray-900">{v.title}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={v.status} />
+                        <div className="flex items-center gap-2">
+                          <StatusBadge status={v.status} />
+                          {v.status === 'PROCESSING' && (
+                            <Loader2 className="h-3 w-3 animate-spin text-yellow-600" />
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {v.priceCents === 0 ? 'Free' : formatPrice(v.priceCents)}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{formatDate(v.createdAt)}</td>
                       <td className="px-4 py-3 text-right">
-                        <Link
-                          to={`/creator/videos/${v.id}/edit`}
-                          className="text-primary hover:underline"
-                        >
-                          Edit
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <Link
+                            to={`/creator/videos/${v.id}/edit`}
+                            className="text-primary hover:underline"
+                          >
+                            Edit
+                          </Link>
+                          <button
+                            onClick={() => setDeleteTarget(v)}
+                            className="text-gray-400 hover:text-danger"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -127,6 +173,26 @@ export default function DashboardPage() {
           <Pagination page={page} totalPages={videos.totalPages} onPageChange={setPage} />
         </div>
       )}
+
+      {/* Delete confirmation modal */}
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="Delete Video"
+      >
+        <p className="text-sm text-gray-600">
+          Are you sure you want to delete <strong>{deleteTarget?.title}</strong>? This action
+          cannot be undone.
+        </p>
+        <div className="mt-4 flex justify-end gap-3">
+          <Button variant="ghost" onClick={() => setDeleteTarget(null)}>
+            Cancel
+          </Button>
+          <Button variant="danger" loading={deleting} onClick={handleDelete}>
+            Delete
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 }

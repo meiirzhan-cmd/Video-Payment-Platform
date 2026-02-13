@@ -5,6 +5,7 @@ import ProtectedRoute from '@/auth/components/ProtectedRoute';
 import CreatorRoute from '@/auth/components/CreatorRoute';
 import CatalogPage from '@/videos/CatalogPage';
 import VideoDetailPage from '@/videos/VideoDetailPage';
+import WatchPage from '@/videos/WatchPage';
 import LoginPage from '@/auth/LoginPage';
 import RegisterPage from '@/auth/RegisterPage';
 import PurchasesPage from '@/user/PurchasesPage';
@@ -13,6 +14,7 @@ import CheckoutCancelPage from '@/payment/CheckoutCancelPage';
 import DashboardPage from '@/creator/DashboardPage';
 import UploadPage from '@/creator/UploadPage';
 import EditVideoPage from '@/creator/EditVideoPage';
+import NotFoundPage from '@/shared/components/NotFoundPage';
 
 export const router = createBrowserRouter([
   {
@@ -35,6 +37,7 @@ export const router = createBrowserRouter([
       {
         element: <ProtectedRoute />,
         children: [
+          { path: '/videos/:id/watch', element: <WatchPage /> },
           { path: '/purchases', element: <PurchasesPage /> },
           { path: '/checkout/success', element: <CheckoutSuccessPage /> },
           { path: '/checkout/cancel', element: <CheckoutCancelPage /> },
@@ -50,6 +53,9 @@ export const router = createBrowserRouter([
           { path: '/creator/videos/:id/edit', element: <EditVideoPage /> },
         ],
       },
+
+      // 404
+      { path: '*', element: <NotFoundPage /> },
     ],
   },
 ]);
