@@ -6,7 +6,7 @@ import com.learnstream.video.VideoRepository;
 import com.learnstream.video.VideoStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
@@ -39,27 +39,26 @@ public class TranscodingWorker {
         this.config = config;
     }
 
-    @Scheduled(fixedDelayString = "${transcoding.poll-interval-ms:5000}")
-    public void poll() {
-        TranscodingJob job = transcodingService.claimNextJob();
-        if (job == null) return;
+    @KafkaListener(topics = "${transcoding.topic:transcoding-jobs}", groupId = "learnstream-transcoding")
+    public void onTranscodingRequested(TranscodingRequestedEvent event) {
+        log.info("Received transcoding event for job {} video {}", event.jobId(), event.videoId());
 
-        log.info("Processing transcoding job {} for video {}", job.getId(), job.getVideoId());
+        transcodingService.markInProgress(event.jobId());
 
         try {
-            processJob(job);
+            processJob(event.jobId(), event.videoId());
         } catch (Exception e) {
-            log.error("Transcoding failed for job {}", job.getId(), e);
-            transcodingService.markFailed(job.getId(), e.getMessage());
-            updateVideoStatus(job.getVideoId(), VideoStatus.FAILED);
+            log.error("Transcoding failed for job {}", event.jobId(), e);
+            transcodingService.markFailed(event.jobId(), e.getMessage());
+            updateVideoStatus(event.videoId(), VideoStatus.FAILED);
         }
     }
 
-    private void processJob(TranscodingJob job) throws IOException, InterruptedException {
-        Video video = videoRepository.findById(job.getVideoId())
-                .orElseThrow(() -> new IllegalStateException("Video not found: " + job.getVideoId()));
+    private void processJob(UUID jobId, UUID videoId) throws IOException, InterruptedException {
+        Video video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new IllegalStateException("Video not found: " + videoId));
 
-        Path workDir = Path.of(config.tempDir(), job.getId().toString());
+        Path workDir = Path.of(config.tempDir(), jobId.toString());
         Files.createDirectories(workDir);
 
         try {
@@ -95,7 +94,7 @@ public class TranscodingWorker {
             video.setStatus(VideoStatus.READY);
             videoRepository.save(video);
 
-            transcodingService.markCompleted(job.getId());
+            transcodingService.markCompleted(jobId);
             log.info("Transcoding completed for video {}", video.getId());
 
         } finally {
