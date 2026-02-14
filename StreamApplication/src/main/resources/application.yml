@@ -24,6 +24,19 @@ spring:
       max-file-size: 2GB
       max-request-size: 2GB
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: learnstream-transcoding
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: com.learnstream.transcoding
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
 server:
   port: ${SERVER_PORT:8080}
 
@@ -50,7 +63,7 @@ transcoding:
   ffmpeg-path: ${FFMPEG_PATH:/usr/bin/ffmpeg}
   ffprobe-path: ${FFPROBE_PATH:/usr/bin/ffprobe}
   temp-dir: ${TRANSCODING_TEMP_DIR:/tmp/transcoding}
-  poll-interval-ms: ${TRANSCODING_POLL_INTERVAL:5000}
+  topic: ${TRANSCODING_TOPIC:transcoding-jobs}
   qualities:
     - label: 360p
       width: 640
@@ -94,6 +107,9 @@ spring:
 
   datasource:
     url: ${DB_URL:jdbc:postgresql://postgres:5432/learnstream}
+
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:kafka:9092}
 
   data:
     redis:

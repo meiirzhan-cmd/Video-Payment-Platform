@@ -9,7 +9,7 @@ public record TranscodingConfig(
         String ffmpegPath,
         String ffprobePath,
         String tempDir,
-        long pollIntervalMs,
+        String topic,
         List<QualityPreset> qualities
 ) {
     public record QualityPreset(
