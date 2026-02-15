@@ -26,7 +26,7 @@ repositories {
 
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
-	implementation 'org.flywaydb:flyway-core'
+	implementation 'org.springframework.boot:spring-boot-flyway'
 	implementation 'org.flywaydb:flyway-database-postgresql'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
 	implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
@@ -37,6 +37,7 @@ dependencies {
 	implementation platform('software.amazon.awssdk:bom:2.29.0')
 	implementation 'software.amazon.awssdk:s3'
 	implementation 'com.stripe:stripe-java:28.2.0'
+	implementation 'org.springframework.boot:spring-boot-kafka'
 	implementation 'org.springframework.kafka:spring-kafka'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'org.postgresql:postgresql'
