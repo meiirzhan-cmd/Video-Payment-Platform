@@ -93,6 +93,21 @@ public class VideoController {
         return ResponseEntity.ok(videoService.getStreamUrl(id));
     }
 
+    @PutMapping(value = "/videos/{id}/thumbnail", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<VideoResponse> uploadThumbnail(
+            @PathVariable UUID id,
+            @RequestParam("file") MultipartFile file,
+            @CurrentUser UUID creatorId) throws IOException {
+        return ResponseEntity.ok(videoService.uploadThumbnail(id, file, creatorId));
+    }
+
+    @DeleteMapping("/videos/{id}/thumbnail")
+    public ResponseEntity<VideoResponse> deleteThumbnail(
+            @PathVariable UUID id,
+            @CurrentUser UUID creatorId) {
+        return ResponseEntity.ok(videoService.deleteThumbnail(id, creatorId));
+    }
+
     @GetMapping("/creator/videos")
     public ResponseEntity<PageResponse<VideoResponse>> listCreatorVideos(
             @CurrentUser UUID creatorId,

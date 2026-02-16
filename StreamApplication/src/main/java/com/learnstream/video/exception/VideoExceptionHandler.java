@@ -22,4 +22,9 @@ public class VideoExceptionHandler {
     public ProblemDetail handleInvalidFile(InvalidVideoFileException ex) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
     }
+
+    @ExceptionHandler(InvalidThumbnailException.class)
+    public ProblemDetail handleInvalidThumbnail(InvalidThumbnailException ex) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
 }

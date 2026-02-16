@@ -89,7 +89,10 @@ public class TranscodingWorker {
 
             // Step 7: Update video record
             video.setHlsStorageKey(hlsPrefix + "master.m3u8");
-            video.setThumbnailUrl(thumbnailKey);
+            // Only set auto-generated thumbnail if no custom thumbnail was uploaded
+            if (video.getThumbnailUrl() == null || !video.getThumbnailUrl().contains("custom-thumbnail")) {
+                video.setThumbnailUrl(thumbnailKey);
+            }
             video.setDurationSecs(durationSecs);
             video.setStatus(VideoStatus.READY);
             videoRepository.save(video);
