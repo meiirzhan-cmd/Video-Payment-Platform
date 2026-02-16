@@ -61,6 +61,29 @@ export async function getStreamUrl(id: string): Promise<StreamResponse> {
   return res.data;
 }
 
+export async function uploadThumbnail(
+  id: string,
+  file: File,
+  onProgress?: (percent: number) => void,
+): Promise<VideoResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await apiClient.put<VideoResponse>(`/videos/${id}/thumbnail`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (e) => {
+      if (onProgress && e.total) {
+        onProgress(Math.round((e.loaded * 100) / e.total));
+      }
+    },
+  });
+  return res.data;
+}
+
+export async function deleteThumbnail(id: string): Promise<VideoResponse> {
+  const res = await apiClient.delete<VideoResponse>(`/videos/${id}/thumbnail`);
+  return res.data;
+}
+
 export async function listCreatorVideos(
   page = 0,
   size = DEFAULT_PAGE_SIZE,

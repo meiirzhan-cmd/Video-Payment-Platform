@@ -1,12 +1,20 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { LogOut, PlayCircle, Upload, LayoutDashboard, ShoppingBag, Menu, X } from 'lucide-react';
-import { useAuthStore } from '@/auth/auth-store';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import {
+  LogOut,
+  PlayCircle,
+  Upload,
+  LayoutDashboard,
+  ShoppingBag,
+  Menu,
+  X,
+} from "lucide-react";
+import { useAuthStore } from "@/auth/auth-store";
 
 export default function Navbar() {
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const isCreator = user?.role === 'CREATOR' || user?.role === 'ADMIN';
+  const isCreator = user?.role === "CREATOR" || user?.role === "ADMIN";
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const navLinks = (
@@ -40,8 +48,7 @@ export default function Navbar() {
           >
             <ShoppingBag className="h-4 w-4" />
             Purchases
-          </Link>
-          <span className="text-sm text-gray-500">{user.email}</span>
+          </Link>{" "}
           <button
             onClick={() => {
               logout();
@@ -77,7 +84,10 @@ export default function Navbar() {
   return (
     <nav className="border-b bg-white">
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
-        <Link to="/" className="flex items-center gap-2 text-xl font-bold text-primary">
+        <Link
+          to="/"
+          className="flex items-center gap-2 text-xl font-bold text-primary"
+        >
           <PlayCircle className="h-6 w-6" />
           LearnStream
         </Link>
@@ -90,13 +100,19 @@ export default function Navbar() {
           onClick={() => setMobileOpen(!mobileOpen)}
           className="text-gray-600 md:hidden"
         >
-          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          {mobileOpen ? (
+            <X className="h-6 w-6" />
+          ) : (
+            <Menu className="h-6 w-6" />
+          )}
         </button>
       </div>
 
       {/* Mobile dropdown */}
       {mobileOpen && (
-        <div className="flex flex-col gap-4 border-t px-4 py-4 md:hidden">{navLinks}</div>
+        <div className="flex flex-col gap-4 border-t px-4 py-4 md:hidden">
+          {navLinks}
+        </div>
       )}
     </nav>
   );

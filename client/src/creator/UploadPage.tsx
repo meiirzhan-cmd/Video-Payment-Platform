@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Upload } from 'lucide-react';
+import { ImagePlus, Upload, X } from 'lucide-react';
 import { createVideoSchema, type CreateVideoFormData } from '@/lib/schemas';
 import * as videosApi from '@/api/videos';
 import Input from '@/shared/components/Input';
@@ -10,6 +10,8 @@ import Button from '@/shared/components/Button';
 
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2 GB
 const ACCEPTED_TYPES = ['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo'];
+const ACCEPTED_THUMBNAIL_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export default function UploadPage() {
   const navigate = useNavigate();
@@ -20,6 +22,9 @@ export default function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
+  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailError, setThumbnailError] = useState('');
 
   const {
     register,
@@ -71,12 +76,41 @@ export default function UploadPage() {
     setFile(selected);
   };
 
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setThumbnailError('');
+    const selected = e.target.files?.[0] ?? null;
+    if (!selected) {
+      clearThumbnail();
+      return;
+    }
+    if (!ACCEPTED_THUMBNAIL_TYPES.has(selected.type)) {
+      setThumbnailError('Please select a valid image (JPEG, PNG, or WebP)');
+      return;
+    }
+    if (selected.size > MAX_THUMBNAIL_SIZE) {
+      setThumbnailError('Image must be under 5 MB');
+      return;
+    }
+    setThumbnail(selected);
+    setThumbnailPreview(URL.createObjectURL(selected));
+  };
+
+  const clearThumbnail = () => {
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnail(null);
+    setThumbnailPreview(null);
+    setThumbnailError('');
+  };
+
   const onUploadFile = async () => {
     if (!videoId || !file) return;
     setUploading(true);
     setError('');
     try {
       await videosApi.upload(videoId, file, setProgress);
+      if (thumbnail) {
+        await videosApi.uploadThumbnail(videoId, thumbnail);
+      }
       navigate('/creator/dashboard');
     } catch {
       setError('Upload failed. Please try again.');
@@ -148,6 +182,47 @@ export default function UploadPage() {
                 {file.name} ({(file.size / (1024 * 1024)).toFixed(1)} MB)
               </p>
             )}
+          </div>
+
+          {/* Optional thumbnail */}
+          <div className="flex flex-col gap-2 border-t pt-4">
+            <label className="text-sm font-medium text-gray-700">Cover Image (optional)</label>
+            <p className="text-xs text-gray-500">
+              If not provided, a frame will be auto-extracted from the video.
+            </p>
+            {thumbnailPreview ? (
+              <div className="relative inline-block">
+                <img
+                  src={thumbnailPreview}
+                  alt="Thumbnail preview"
+                  className="h-36 rounded-lg border object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={clearThumbnail}
+                  disabled={uploading}
+                  className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white
+                    hover:bg-gray-700"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ) : (
+              <label className="flex cursor-pointer items-center gap-2 rounded-lg border
+                border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500
+                hover:border-primary hover:text-primary">
+                <ImagePlus className="h-4 w-4" />
+                Choose cover image
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleThumbnailChange}
+                  disabled={uploading}
+                  className="hidden"
+                />
+              </label>
+            )}
+            {thumbnailError && <p className="text-xs text-danger">{thumbnailError}</p>}
           </div>
 
           {uploading && (

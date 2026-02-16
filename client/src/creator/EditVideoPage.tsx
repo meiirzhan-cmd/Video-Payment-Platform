@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Loader2, Trash2, Upload } from 'lucide-react';
+import { ImagePlus, Loader2, Trash2, Upload, X } from 'lucide-react';
 import { updateVideoSchema, type UpdateVideoFormData } from '@/lib/schemas';
 import * as videosApi from '@/api/videos';
 import type { VideoResponse } from '@/lib/types';
@@ -14,6 +14,8 @@ import { useToastStore } from '@/shared/toast-store';
 
 const ACCEPTED_TYPES = new Set(['video/mp4', 'video/quicktime', 'video/webm', 'video/x-msvideo']);
 const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024;
+const ACCEPTED_THUMBNAIL_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_THUMBNAIL_SIZE = 5 * 1024 * 1024; // 5 MB
 
 export default function EditVideoPage() {
   const { id } = useParams<{ id: string }>();
@@ -30,6 +32,13 @@ export default function EditVideoPage() {
   const [fileError, setFileError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Thumbnail state
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailError, setThumbnailError] = useState('');
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
+  const [thumbnailDeleting, setThumbnailDeleting] = useState(false);
 
   const {
     register,
@@ -122,6 +131,53 @@ export default function EditVideoPage() {
     }
   };
 
+  const handleThumbnailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setThumbnailError('');
+    const selected = e.target.files?.[0] ?? null;
+    if (!selected) return;
+    if (!ACCEPTED_THUMBNAIL_TYPES.has(selected.type)) {
+      setThumbnailError('Please select a valid image (JPEG, PNG, or WebP)');
+      return;
+    }
+    if (selected.size > MAX_THUMBNAIL_SIZE) {
+      setThumbnailError('Image must be under 5 MB');
+      return;
+    }
+    setThumbnailFile(selected);
+    setThumbnailPreview(URL.createObjectURL(selected));
+  };
+
+  const handleThumbnailUpload = async () => {
+    if (!id || !thumbnailFile) return;
+    setThumbnailUploading(true);
+    try {
+      const updated = await videosApi.uploadThumbnail(id, thumbnailFile);
+      setVideo(updated);
+      if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+      setThumbnailFile(null);
+      setThumbnailPreview(null);
+      addToast('Cover image uploaded', 'success');
+    } catch {
+      setThumbnailError('Failed to upload cover image');
+    } finally {
+      setThumbnailUploading(false);
+    }
+  };
+
+  const handleThumbnailDelete = async () => {
+    if (!id) return;
+    setThumbnailDeleting(true);
+    try {
+      const updated = await videosApi.deleteThumbnail(id);
+      setVideo(updated);
+      addToast('Custom cover removed', 'success');
+    } catch {
+      addToast('Failed to remove cover image', 'error');
+    } finally {
+      setThumbnailDeleting(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -186,6 +242,84 @@ export default function EditVideoPage() {
           </Button>
         </div>
       </form>
+
+      {/* Cover image section */}
+      <div className="space-y-3 rounded-xl border bg-white p-6">
+        <h2 className="text-sm font-semibold text-gray-900">Cover Image</h2>
+        {video.thumbnailUrl ? (
+          <div className="relative inline-block">
+            <img
+              src={video.thumbnailUrl}
+              alt="Current thumbnail"
+              className="h-40 rounded-lg border object-cover"
+            />
+            {video.thumbnailUrl.includes('custom-thumbnail') && (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="mt-2"
+                loading={thumbnailDeleting}
+                onClick={handleThumbnailDelete}
+              >
+                <Trash2 className="h-3 w-3" />
+                Remove custom cover
+              </Button>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-500">No thumbnail yet — one will be auto-generated after processing.</p>
+        )}
+
+        <div className="flex flex-col gap-2 border-t pt-3">
+          <p className="text-xs text-gray-500">Upload a new cover image (JPEG, PNG, or WebP, max 5 MB)</p>
+          {thumbnailPreview ? (
+            <div className="relative inline-block">
+              <img
+                src={thumbnailPreview}
+                alt="New thumbnail preview"
+                className="h-36 rounded-lg border object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+                  setThumbnailFile(null);
+                  setThumbnailPreview(null);
+                }}
+                className="absolute -right-2 -top-2 rounded-full bg-gray-800 p-1 text-white
+                  hover:bg-gray-700"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          ) : (
+            <label className="flex w-fit cursor-pointer items-center gap-2 rounded-lg border
+              border-dashed border-gray-300 px-4 py-3 text-sm text-gray-500
+              hover:border-primary hover:text-primary">
+              <ImagePlus className="h-4 w-4" />
+              Choose image
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleThumbnailChange}
+                className="hidden"
+              />
+            </label>
+          )}
+          {thumbnailError && <p className="text-xs text-danger">{thumbnailError}</p>}
+          {thumbnailFile && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={handleThumbnailUpload}
+              loading={thumbnailUploading}
+            >
+              <Upload className="h-4 w-4" />
+              Upload Cover
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Re-upload section */}
       <div className="space-y-3 rounded-xl border bg-white p-6">
