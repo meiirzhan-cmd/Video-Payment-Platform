@@ -12,6 +12,7 @@ import com.learnstream.video.VideoRepository;
 import com.learnstream.video.VideoStatus;
 import com.learnstream.video.dto.PageResponse;
 import com.learnstream.video.exception.VideoNotFoundException;
+import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
 import com.stripe.model.Event;
@@ -38,6 +39,9 @@ public class PaymentService {
 
     @Value("${stripe.webhook-secret}")
     private String webhookSecret;
+
+    @Value("${app.base-url}")
+    private String appBaseUrl;
 
     public PaymentService(PurchaseRepository purchaseRepository,
                           StripeEventRepository stripeEventRepository,
@@ -79,8 +83,8 @@ public class PaymentService {
         try {
             SessionCreateParams params = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
-                    .setSuccessUrl("http://localhost:5173/purchase/success?session_id={CHECKOUT_SESSION_ID}")
-                    .setCancelUrl("http://localhost:5173/purchase/cancel")
+                    .setSuccessUrl(appBaseUrl + "/purchase/success?session_id={CHECKOUT_SESSION_ID}")
+                    .setCancelUrl(appBaseUrl + "/purchase/cancel")
                     .addLineItem(SessionCreateParams.LineItem.builder()
                             .setQuantity(1L)
                             .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
@@ -108,6 +112,10 @@ public class PaymentService {
             purchaseRepository.save(purchase);
 
             return new CheckoutResponse(session.getUrl(), session.getId());
+        } catch (InvalidRequestException e) {
+            // Stripe validation error (e.g. amount too low) — surface a clear message
+            throw new PaymentProcessingException(e.getUserMessage() != null
+                    ? e.getUserMessage() : e.getMessage(), e);
         } catch (StripeException e) {
             throw new PaymentProcessingException(e.getMessage(), e);
         }
