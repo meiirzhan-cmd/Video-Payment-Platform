@@ -32,3 +32,12 @@ export function isTokenExpired(token: string): boolean {
   if (!payload) return true;
   return Date.now() >= payload.exp * 1000;
 }
+
+/**
+ * Returns { expiresAt, issuedAt } in milliseconds, or null if the token is invalid.
+ */
+export function getTokenTiming(token: string): { issuedAt: number; expiresAt: number } | null {
+  const payload = decodeJwt(token);
+  if (!payload) return null;
+  return { issuedAt: payload.iat * 1000, expiresAt: payload.exp * 1000 };
+}
