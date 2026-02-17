@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { useAuthStore } from '@/auth/auth-store';
+import { API_URL } from '@/lib/constants';
 
 interface VideoPlayerProps {
   src: string;
-  onUrlExpired?: () => Promise<string | null>;
 }
 
 interface QualityLevel {
@@ -11,7 +12,7 @@ interface QualityLevel {
   label: string;
 }
 
-export default function VideoPlayer({ src, onUrlExpired }: VideoPlayerProps) {
+export default function VideoPlayer({ src }: VideoPlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   const [qualities, setQualities] = useState<QualityLevel[]>([]);
@@ -28,9 +29,12 @@ export default function VideoPlayer({ src, onUrlExpired }: VideoPlayerProps) {
     const video = videoRef.current;
     if (!video) return;
 
+    // Resolve the backend proxy URL
+    const hlsUrl = src.startsWith('/') ? `${API_URL}${src.replace(/^\/api/, '')}` : src;
+
     // Safari native HLS support
     if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
+      video.src = hlsUrl;
       return;
     }
 
@@ -39,10 +43,16 @@ export default function VideoPlayer({ src, onUrlExpired }: VideoPlayerProps) {
     const hls = new Hls({
       enableWorker: true,
       startLevel: -1,
+      xhrSetup: (xhr) => {
+        const token = useAuthStore.getState().accessToken;
+        if (token) {
+          xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        }
+      },
     });
     hlsRef.current = hls;
 
-    hls.loadSource(src);
+    hls.loadSource(hlsUrl);
     hls.attachMedia(video);
 
     hls.on(Hls.Events.MANIFEST_PARSED, () => {
@@ -54,23 +64,27 @@ export default function VideoPlayer({ src, onUrlExpired }: VideoPlayerProps) {
       setCurrentQuality(-1);
     });
 
+    // Fallback: if the proactive refresh timer missed (e.g. tab was
+    // backgrounded), catch 401/403 from HLS requests, refresh once, and retry.
+    let isRefreshing = false;
+
     hls.on(Hls.Events.ERROR, async (_event, data) => {
-      // Handle presigned URL expiration (403 on segment fetch)
       if (
         data.type === Hls.ErrorTypes.NETWORK_ERROR &&
-        data.response?.code === 403 &&
-        onUrlExpired
+        (data.response?.code === 401 || data.response?.code === 403)
       ) {
-        const newUrl = await onUrlExpired();
-        if (newUrl) {
-          const currentTime = video.currentTime;
-          hls.loadSource(newUrl);
-          hls.once(Hls.Events.MANIFEST_PARSED, () => {
-            video.currentTime = currentTime;
-            video.play();
-          });
-          return;
+        if (!isRefreshing) {
+          isRefreshing = true;
+          hls.stopLoad();
+          const success = await useAuthStore.getState().refresh();
+          isRefreshing = false;
+          if (success) {
+            hls.startLoad();
+            return;
+          }
         }
+        // Already refreshing or refresh failed — ignore duplicate 401s
+        return;
       }
 
       if (data.fatal) {
@@ -92,7 +106,7 @@ export default function VideoPlayer({ src, onUrlExpired }: VideoPlayerProps) {
       hls.destroy();
       hlsRef.current = null;
     };
-  }, [src, onUrlExpired]);
+  }, [src]);
 
   // Keyboard shortcuts
   useEffect(() => {

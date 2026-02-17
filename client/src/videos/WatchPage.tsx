@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { Navigate, useParams } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import * as videosApi from "@/api/videos";
@@ -45,17 +45,6 @@ export default function WatchPage() {
     };
   }, [id]);
 
-  const handleUrlExpired = useCallback(async () => {
-    if (!id) return null;
-    try {
-      const stream = await videosApi.getStreamUrl(id);
-      setHlsUrl(stream.hlsUrl);
-      return stream.hlsUrl;
-    } catch {
-      return null;
-    }
-  }, [id]);
-
   if (isLoading || accessLoading) {
     return (
       <div className="flex justify-center py-16">
@@ -79,7 +68,7 @@ export default function WatchPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <VideoPlayer src={hlsUrl} onUrlExpired={handleUrlExpired} />
+      <VideoPlayer src={hlsUrl} />
 
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{video.title}</h1>
