@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.UUID;
 
 @RestController
@@ -106,6 +108,33 @@ public class VideoController {
             @PathVariable UUID id,
             @CurrentUser UUID creatorId) {
         return ResponseEntity.ok(videoService.deleteThumbnail(id, creatorId));
+    }
+
+    // ── HLS proxy (authenticated) ───────────────────────────
+
+    @GetMapping("/videos/{id}/hls/{*path}")
+    public ResponseEntity<InputStreamResource> proxyHls(
+            @PathVariable UUID id,
+            @PathVariable String path,
+            @CurrentUser UUID userId) {
+        if (!paymentService.hasAccess(userId, id)) {
+            throw new VideoAccessDeniedException();
+        }
+
+        // Strip leading slash from path capture
+        String filePath = path.startsWith("/") ? path.substring(1) : path;
+        InputStream stream = videoService.streamHlsContent(id, filePath);
+
+        String contentType = "application/octet-stream";
+        if (filePath.endsWith(".m3u8")) {
+            contentType = "application/vnd.apple.mpegurl";
+        } else if (filePath.endsWith(".ts")) {
+            contentType = "video/mp2t";
+        }
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(new InputStreamResource(stream));
     }
 
     @GetMapping("/creator/videos")

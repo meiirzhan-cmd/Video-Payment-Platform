@@ -224,10 +224,27 @@ public class VideoService {
             throw new VideoAccessDeniedException();
         }
 
-        var url = storageService.generatePresignedUrl(
-                storageService.processedBucket(), video.getHlsStorageKey(), 60);
+        // Return backend proxy URL instead of presigned MinIO URL
+        String proxyUrl = "/api/videos/" + videoId + "/hls/master.m3u8";
+        return new StreamResponse(proxyUrl);
+    }
 
-        return new StreamResponse(url.toString());
+    @Transactional(readOnly = true)
+    public java.io.InputStream streamHlsContent(UUID videoId, String path) {
+        var video = videoRepository.findById(videoId)
+                .orElseThrow(() -> new VideoNotFoundException(videoId));
+
+        if (video.getStatus() != VideoStatus.READY || video.getHlsStorageKey() == null) {
+            throw new VideoAccessDeniedException();
+        }
+
+        // hlsStorageKey = "{creatorId}/{videoId}/hls/master.m3u8"
+        // Derive the base path: "{creatorId}/{videoId}/hls/"
+        String hlsBase = video.getHlsStorageKey()
+                .substring(0, video.getHlsStorageKey().lastIndexOf('/') + 1);
+        String storageKey = hlsBase + path;
+
+        return storageService.download(storageService.processedBucket(), storageKey);
     }
 
     private VideoResponse toResponse(Video video) {
