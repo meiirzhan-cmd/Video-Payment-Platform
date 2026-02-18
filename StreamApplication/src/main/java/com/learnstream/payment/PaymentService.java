@@ -83,8 +83,8 @@ public class PaymentService {
         try {
             SessionCreateParams params = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
-                    .setSuccessUrl(appBaseUrl + "/purchase/success?session_id={CHECKOUT_SESSION_ID}")
-                    .setCancelUrl(appBaseUrl + "/purchase/cancel")
+                    .setSuccessUrl(appBaseUrl + "/checkout/success?session_id={CHECKOUT_SESSION_ID}&videoId=" + video.getId())
+                    .setCancelUrl(appBaseUrl + "/checkout/cancel")
                     .addLineItem(SessionCreateParams.LineItem.builder()
                             .setQuantity(1L)
                             .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
