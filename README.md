@@ -43,15 +43,15 @@ Viewers see their completed purchases with amounts and dates.
 │   HLS.js     │     │   Proxy      │     │   (Java 21)  │
 └──────────────┘     └──────────────┘     └──────┬───────┘
                                                   │
-                          ┌───────────────────────┼───────────────────────┐
-                          │                       │                       │
+                          ┌───────────────────────┼──────────────────────┐
+                          │                       │                      │
                    ┌──────▼──────┐        ┌───────▼──────┐       ┌───────▼──────┐
-                   │  PostgreSQL │        │    MinIO      │       │    Kafka     │
-                   │  (Users,    │        │  (S3-compat)  │       │  (Transcode  │
-                   │   Videos,   │        │  raw-videos   │       │   Jobs)      │
-                   │   Purchases)│        │  processed-   │       │              │
-                   └─────────────┘        │  videos       │       └──────────────┘
-                                          └───────────────┘
+                   │  PostgreSQL │        │    MinIO     │       │    Kafka     │
+                   │  (Users,    │        │  (S3-compat) │       │  (Transcode  │
+                   │   Videos,   │        │  raw-videos  │       │   Jobs)      │
+                   │   Purchases)│        │  processed-  │       │              │
+                   └─────────────┘        │  videos      │       └──────────────┘
+                                          └──────────────┘
                                                                   ┌──────────────┐
                                                                   │   Stripe     │
                                                                   │   (Checkout  │
