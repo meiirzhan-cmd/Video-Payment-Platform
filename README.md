@@ -12,18 +12,23 @@ This project exists as a hands-on learning exercise for two complex domains:
 
 ## Screenshots
 
+### Creator Dashboard
+Creators manage uploaded videos, track processing status, view total purchases and earnings.
+
+![Creator Dashboard](screenshots/image6.png)
+
 ### Video Player with Adaptive Quality Selector
 HLS.js player with manual quality switching (360p, 720p, 1080p, Auto). All stream segments are authenticated via JWT through a backend proxy.
 
 ![Video Player](screenshots/image5.png)
 
-### Creator Dashboard
-Creators manage their uploaded videos, track total purchases, and view earnings.
+### Stripe Checkout
+Stripe-hosted checkout page in test mode. The backend creates a Checkout Session with video metadata, and Stripe handles the payment form.
 
-![Creator Dashboard](screenshots/image2.png)
+![Stripe Checkout](screenshots/image7.png)
 
-### Payment Flow
-Stripe Checkout handles the payment. After checkout, the app polls the backend to confirm purchase completion via webhook.
+### Payment Confirmation
+After Stripe redirects back, the app polls the backend to confirm the webhook has completed the purchase.
 
 ![Processing Purchase](screenshots/image3.png)
 
@@ -37,21 +42,21 @@ Viewers see their completed purchases with amounts and dates.
 ## Architecture
 
 ```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│   Frontend   │────>│   Nginx      │────>│  Spring Boot │
-│   React/Vite │     │   Reverse    │     │   Backend    │
-│   HLS.js     │     │   Proxy      │     │   (Java 21)  │
-└──────────────┘     └──────────────┘     └──────┬───────┘
+┌──────────────┐     ┌──────────────┐      ┌──────────────┐
+│   Frontend   │────>│   Nginx      │─────>│  Spring Boot │
+│   React/Vite │     │   Reverse    │      │   Backend    │
+│   HLS.js     │     │   Proxy      │      │   (Java 21)  │
+└──────────────┘     └──────────────┘      └──────┬───────┘
                                                   │
-                          ┌───────────────────────┼───────────────────────┐
-                          │                       │                       │
+                          ┌───────────────────────┼──────────────────────┐
+                          │                       │                      │
                    ┌──────▼──────┐        ┌───────▼──────┐       ┌───────▼──────┐
-                   │  PostgreSQL │        │    MinIO      │       │    Kafka     │
-                   │  (Users,    │        │  (S3-compat)  │       │  (Transcode  │
-                   │   Videos,   │        │  raw-videos   │       │   Jobs)      │
-                   │   Purchases)│        │  processed-   │       │              │
-                   └─────────────┘        │  videos       │       └──────────────┘
-                                          └───────────────┘
+                   │  PostgreSQL │        │    MinIO     │       │    Kafka     │
+                   │  (Users,    │        │  (S3-compat) │       │  (Transcode  │
+                   │   Videos,   │        │  raw-videos  │       │   Jobs)      │
+                   │   Purchases)│        │  processed-  │       │              │
+                   └─────────────┘        │  videos      │       └──────────────┘
+                                          └──────────────┘
                                                                   ┌──────────────┐
                                                                   │   Stripe     │
                                                                   │   (Checkout  │
